@@ -28,7 +28,7 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "./ui/card";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CallsFilter, FilterParams } from "@/components/calls-filter";
 
 type Call = {
@@ -59,6 +59,9 @@ type Assistant = {
 };
 
 export function CallsTable() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   // State for data
   const [calls, setCalls] = useState<Call[]>([]);
   const [clinics, setClinics] = useState<Clinic[]>([]);
@@ -69,42 +72,59 @@ export function CallsTable() {
   const [currentFilters, setCurrentFilters] = useState<FilterParams>({});
 
   // State for pagination and sorting
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() => {
+    const page = searchParams.get("page");
+    return page ? parseInt(page) : 1;
+  });
   const [pageSize] = useState(10);
   const [sortBy, setSortBy] = useState("call_start_time");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const router = useRouter();
 
-  // Load clinics and assistants
-  useEffect(() => {
-    const loadOptions = async () => {
-      try {
-        const response = await fetch("/api/options");
-        const data = await response.json();
+  // Function to update URL with current state
+  const updateURL = (page: number, filters: FilterParams) => {
+    const url = new URL(window.location.href);
 
-        if (data.error) {
-          throw new Error(data.error);
-        }
+    // Update page parameter
+    url.searchParams.set("page", page.toString());
 
-        setClinics(data.clinics);
-        setAssistants(data.assistants);
-      } catch (error) {
-        console.error("Error loading options:", error);
-      }
-    };
+    // Update filter parameters
+    if (filters.clinic_id) url.searchParams.set("clinicId", filters.clinic_id);
+    else url.searchParams.delete("clinicId");
 
-    loadOptions();
-  }, []);
+    if (filters.assistant_id)
+      url.searchParams.set("assistantId", filters.assistant_id);
+    else url.searchParams.delete("assistantId");
+
+    if (filters.start_date)
+      url.searchParams.set("startDate", filters.start_date);
+    else url.searchParams.delete("startDate");
+
+    if (filters.end_date) url.searchParams.set("endDate", filters.end_date);
+    else url.searchParams.delete("endDate");
+
+    if (filters.search_query)
+      url.searchParams.set("search", filters.search_query);
+    else url.searchParams.delete("search");
+
+    if (filters.evaluation_status && filters.evaluation_status !== "all")
+      url.searchParams.set("evaluationStatus", filters.evaluation_status);
+    else url.searchParams.delete("evaluationStatus");
+
+    // Update sorting parameters
+    url.searchParams.set("sortBy", sortBy);
+    url.searchParams.set("sortOrder", sortOrder);
+
+    router.push(url.toString());
+  };
 
   // Load calls data
-  const handleFilter = async (filters: FilterParams) => {
+  const loadCalls = async (page: number, filters: FilterParams) => {
     try {
       setLoading(true);
-      setCurrentFilters(filters);
       const url = new URL("/api/calls", window.location.origin);
 
       // Add pagination params
-      url.searchParams.set("page", currentPage.toString());
+      url.searchParams.set("page", page.toString());
       url.searchParams.set("pageSize", pageSize.toString());
 
       // Add filter params
@@ -134,7 +154,9 @@ export function CallsTable() {
       setCalls(data.calls);
       setTotalCalls(data.totalCalls);
       setTotalPages(data.totalPages);
-      setCurrentPage(1); // Reset to first page when filters change
+
+      // Update URL after successful data load
+      updateURL(page, filters);
     } catch (error) {
       console.error("Error loading calls:", error);
     } finally {
@@ -142,10 +164,45 @@ export function CallsTable() {
     }
   };
 
+  const handleFilter = async (filters: FilterParams) => {
+    setCurrentFilters(filters);
+    const newPage = 1; // Reset to first page on filter change
+    setCurrentPage(newPage);
+    await loadCalls(newPage, filters);
+  };
+
+  const handlePageChange = async (newPage: number) => {
+    setCurrentPage(newPage);
+    await loadCalls(newPage, currentFilters);
+  };
+
   // Initial load
   useEffect(() => {
-    handleFilter({});
+    const initialPage = parseInt(searchParams.get("page") || "1");
+    setCurrentPage(initialPage);
+    loadCalls(initialPage, currentFilters);
   }, [sortBy, sortOrder]);
+
+  // Load clinics and assistants
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const response = await fetch("/api/options");
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        setClinics(data.clinics);
+        setAssistants(data.assistants);
+      } catch (error) {
+        console.error("Error loading options:", error);
+      }
+    };
+
+    loadOptions();
+  }, []);
 
   const handleSort = (column: string) => {
     if (sortBy === column) {
@@ -229,15 +286,18 @@ export function CallsTable() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
             Previous
           </Button>
+          <span className="flex items-center px-3">
+            Page {currentPage} of {totalPages}
+          </span>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >
             Next

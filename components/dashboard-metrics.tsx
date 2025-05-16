@@ -1,25 +1,76 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Phone, Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import {
+  Phone,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  Percent,
+  Star,
+  Bot,
+  FileCheck,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
 
 type MetricsData = {
   totalCalls: number;
-  avgDuration: number;
   successRate: number;
-  discrepancyRate: number;
-  callsByDay: { date: string; count: number }[];
+  avgHumanScore: number;
+  avgLLMScore: number;
+  evaluatedRate: number;
+  avgScoreDifference: number;
+  highDiscrepancyRate: number;
+  scoresOverTime: {
+    date: string;
+    humanScore: number;
+    llmScore: number;
+  }[];
+  scoresByAssistant: {
+    name: string;
+    avgScore: number;
+  }[];
+  scoresByClinic: {
+    name: string;
+    avgScore: number;
+  }[];
+  sentimentDistribution: {
+    name: string;
+    value: number;
+  }[];
 };
+
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
 export function DashboardMetrics() {
   const [metricsData, setMetricsData] = useState<MetricsData>({
     totalCalls: 0,
-    avgDuration: 0,
     successRate: 0,
-    discrepancyRate: 0,
-    callsByDay: [],
+    avgHumanScore: 0,
+    avgLLMScore: 0,
+    evaluatedRate: 0,
+    avgScoreDifference: 0,
+    highDiscrepancyRate: 0,
+    scoresOverTime: [],
+    scoresByAssistant: [],
+    scoresByClinic: [],
+    sentimentDistribution: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -28,79 +79,167 @@ export function DashboardMetrics() {
       try {
         setLoading(true);
 
-        // Fetch total calls
-        const { count: totalCalls } = await supabase
-          .from("calls")
-          .select("*", { count: "exact", head: true });
+        // Fetch all calls with their scores and relationships
+        const { data: calls } = await supabase.from("calls").select(`
+            *,
+            assistant:assistant_id(name),
+            clinic:clinic_id(name)
+          `);
 
-        // Fetch average duration
-        const { data: durationData } = await supabase
-          .from("calls")
-          .select("duration")
-          .not("duration", "is", null);
+        if (!calls) return;
 
-        const avgDuration = durationData
-          ? durationData.reduce((acc, curr) => acc + (curr.duration || 0), 0) /
-            durationData.length
-          : 0;
+        // Calculate basic metrics
+        const totalCalls = calls.length;
+        const evaluatedCalls = calls.filter((call) => call.evaluated);
+        const callsWithBothScores = calls.filter(
+          (call) => call.evaluation_score_human && call.evaluation_score_llm
+        );
 
-        // Fetch success rate (calls with positive outcome)
-        const { count: successfulCalls } = await supabase
-          .from("calls")
-          .select("*", { count: "exact", head: true })
-          .gte("evaluation_score_human", 4);
+        // Calculate KPIs
+        const successRate =
+          calls.filter((call) => (call.evaluation_score_human || 0) >= 3)
+            .length / totalCalls;
+        const avgHumanScore =
+          calls.reduce(
+            (acc, call) => acc + (call.evaluation_score_human || 0),
+            0
+          ) / totalCalls;
+        const avgLLMScore =
+          calls.reduce(
+            (acc, call) => acc + (call.evaluation_score_llm || 0),
+            0
+          ) / totalCalls;
+        const evaluatedRate = evaluatedCalls.length / totalCalls;
 
-        // Fetch discrepancy rate (difference between human and LLM scores > 1)
-        const { data: callsData } = await supabase
-          .from("calls")
-          .select("evaluation_score_human, evaluation_score_llm")
-          .not("evaluation_score_human", "is", null)
-          .not("evaluation_score_llm", "is", null);
-
-        const discrepantCalls =
-          callsData?.filter(
+        // Calculate discrepancy metrics
+        const scoreDifferences = callsWithBothScores.map((call) =>
+          Math.abs(
+            (call.evaluation_score_human || 0) -
+              (call.evaluation_score_llm || 0)
+          )
+        );
+        const avgScoreDifference =
+          scoreDifferences.reduce((acc, diff) => acc + diff, 0) /
+          scoreDifferences.length;
+        const highDiscrepancyRate =
+          callsWithBothScores.filter(
             (call) =>
               Math.abs(
                 (call.evaluation_score_human || 0) -
                   (call.evaluation_score_llm || 0)
-              ) > 1
-          ).length || 0;
+              ) >= 2
+          ).length / callsWithBothScores.length;
 
-        // Fetch calls by day for the last 10 days
-        const { data: callsByDay } = await supabase
-          .from("calls")
-          .select("created_at")
-          .gte(
-            "created_at",
-            new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+        // Process scores over time
+        const scoresOverTime = Array.from(
+          new Set(
+            calls.map(
+              (call) =>
+                new Date(call.created_at || "").toISOString().split("T")[0]
+            )
           )
-          .order("created_at");
+        )
+          .map((date) => {
+            const daysCalls = calls.filter(
+              (call) =>
+                new Date(call.created_at || "").toISOString().split("T")[0] ===
+                date
+            );
+            return {
+              date,
+              humanScore:
+                daysCalls.reduce(
+                  (acc, call) => acc + (call.evaluation_score_human || 0),
+                  0
+                ) / daysCalls.length,
+              llmScore:
+                daysCalls.reduce(
+                  (acc, call) => acc + (call.evaluation_score_llm || 0),
+                  0
+                ) / daysCalls.length,
+            };
+          })
+          .sort((a, b) => a.date.localeCompare(b.date));
 
-        // Process calls by day
-        const dailyCalls = callsByDay?.reduce(
-          (acc: { [key: string]: number }, curr) => {
-            const date = new Date(curr.created_at).toISOString().split("T")[0];
-            acc[date] = (acc[date] || 0) + 1;
-            return acc;
-          },
-          {}
+        // Process scores by assistant
+        const assistantScores = new Map<
+          string,
+          { total: number; count: number }
+        >();
+        calls.forEach((call) => {
+          if (call.assistant?.name && call.evaluation_score_human) {
+            const current = assistantScores.get(call.assistant.name) || {
+              total: 0,
+              count: 0,
+            };
+            assistantScores.set(call.assistant.name, {
+              total: current.total + call.evaluation_score_human,
+              count: current.count + 1,
+            });
+          }
+        });
+        const scoresByAssistant = Array.from(assistantScores.entries()).map(
+          ([name, stats]) => ({
+            name,
+            avgScore: stats.total / stats.count,
+          })
         );
 
-        const callsByDayArray = Object.entries(dailyCalls || {}).map(
-          ([date, count]) => ({
-            date,
-            count,
+        // Process scores by clinic
+        const clinicScores = new Map<
+          string,
+          { total: number; count: number }
+        >();
+        calls.forEach((call) => {
+          if (call.clinic?.name && call.evaluation_score_human) {
+            const current = clinicScores.get(call.clinic.name) || {
+              total: 0,
+              count: 0,
+            };
+            clinicScores.set(call.clinic.name, {
+              total: current.total + call.evaluation_score_human,
+              count: current.count + 1,
+            });
+          }
+        });
+        const scoresByClinic = Array.from(clinicScores.entries()).map(
+          ([name, stats]) => ({
+            name,
+            avgScore: stats.total / stats.count,
+          })
+        );
+
+        // Process sentiment distribution (based on LLM scores)
+        const sentimentCounts = calls.reduce((acc, call) => {
+          let sentiment = "Neutral";
+          const score = call.evaluation_score_llm;
+          if (score !== null) {
+            if (score >= 4) sentiment = "Positive";
+            else if (score <= 2) sentiment = "Negative";
+          }
+          acc[sentiment] = (acc[sentiment] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+
+        const sentimentDistribution = Object.entries(sentimentCounts).map(
+          ([name, value]) => ({
+            name,
+            value: value as number,
           })
         );
 
         setMetricsData({
-          totalCalls: totalCalls || 0,
-          avgDuration,
-          successRate: totalCalls ? (successfulCalls || 0) / totalCalls : 0,
-          discrepancyRate: callsData?.length
-            ? discrepantCalls / callsData.length
-            : 0,
-          callsByDay: callsByDayArray,
+          totalCalls,
+          successRate,
+          avgHumanScore,
+          avgLLMScore,
+          evaluatedRate,
+          avgScoreDifference,
+          highDiscrepancyRate,
+          scoresOverTime,
+          scoresByAssistant,
+          scoresByClinic,
+          sentimentDistribution,
         });
       } catch (error) {
         console.error("Error fetching metrics data:", error);
@@ -112,19 +251,14 @@ export function DashboardMetrics() {
     fetchMetricsData();
   }, []);
 
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-  };
-
   if (loading) {
     return <div>Loading metrics...</div>;
   }
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Global KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Calls</CardTitle>
@@ -132,27 +266,6 @@ export function DashboardMetrics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metricsData.totalCalls}</div>
-            <p className="text-xs text-muted-foreground">
-              +
-              {metricsData.callsByDay[metricsData.callsByDay.length - 1]
-                ?.count || 0}{" "}
-              today
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Average Duration
-            </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatDuration(metricsData.avgDuration)}
-            </div>
-            <p className="text-xs text-muted-foreground">Minutes per call</p>
           </CardContent>
         </Card>
 
@@ -165,24 +278,192 @@ export function DashboardMetrics() {
             <div className="text-2xl font-bold">
               {(metricsData.successRate * 100).toFixed(1)}%
             </div>
+            <p className="text-xs text-muted-foreground">Score ≥ 3</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Avg Human Score
+            </CardTitle>
+            <Star className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {metricsData.avgHumanScore.toFixed(1)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg LLM Score</CardTitle>
+            <Bot className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {metricsData.avgLLMScore.toFixed(1)}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Evaluated Rate
+            </CardTitle>
+            <FileCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {(metricsData.evaluatedRate * 100).toFixed(1)}%
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Discrepancy Insights */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Avg Score Difference
+            </CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {metricsData.avgScoreDifference.toFixed(1)}
+            </div>
             <p className="text-xs text-muted-foreground">
-              Calls with positive outcome
+              Between human and LLM
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Discrepancies</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">
+              High Discrepancy Rate
+            </CardTitle>
+            <Percent className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {(metricsData.discrepancyRate * 100).toFixed(1)}%
+              {(metricsData.highDiscrepancyRate * 100).toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground">
-              Between human and LLM evaluation
-            </p>
+            <p className="text-xs text-muted-foreground">Difference ≥ 2</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Scores Over Time */}
+        <Card className="col-span-2">
+          <CardHeader>
+            <CardTitle>Average Scores Over Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metricsData.scoresOverTime}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis domain={[0, 5]} />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="humanScore"
+                    stroke="#8884d8"
+                    name="Human Score"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="llmScore"
+                    stroke="#82ca9d"
+                    name="LLM Score"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Scores by Assistant */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Average Score by Assistant</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={metricsData.scoresByAssistant}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis domain={[0, 5]} />
+                  <Tooltip />
+                  <Bar dataKey="avgScore" fill="#8884d8" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Scores by Clinic */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Average Score by Clinic</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={metricsData.scoresByClinic}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis domain={[0, 5]} />
+                  <Tooltip />
+                  <Bar dataKey="avgScore" fill="#82ca9d" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Sentiment Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Call Sentiment Distribution</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={metricsData.sentimentDistribution}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, percent }) =>
+                      `${name} ${(percent * 100).toFixed(0)}%`
+                    }
+                  >
+                    {metricsData.sentimentDistribution.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       </div>

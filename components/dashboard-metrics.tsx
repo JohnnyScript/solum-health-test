@@ -10,6 +10,7 @@ import {
   Star,
   Bot,
   FileCheck,
+  Calendar,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -28,6 +29,15 @@ import {
   Cell,
   ResponsiveContainer,
 } from "recharts";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 type MetricsData = {
   totalCalls: number;
@@ -56,6 +66,16 @@ type MetricsData = {
   }[];
 };
 
+type Clinic = {
+  id: string;
+  name: string;
+};
+
+type Assistant = {
+  id: string;
+  name: string;
+};
+
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
 export function DashboardMetrics() {
@@ -74,17 +94,92 @@ export function DashboardMetrics() {
   });
   const [loading, setLoading] = useState(true);
 
+  // Filter states
+  const [clinics, setClinics] = useState<Clinic[]>([]);
+  const [assistants, setAssistants] = useState<Assistant[]>([]);
+  const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
+  const [selectedAssistant, setSelectedAssistant] = useState<string | null>(
+    null
+  );
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+
+  // Load clinics and assistants
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const { data: clinicsData } = await supabase
+          .from("clinics")
+          .select("id, name")
+          .order("name");
+
+        setClinics(clinicsData || []);
+
+        const { data: assistantsData } = await supabase
+          .from("assistants")
+          .select("id, name")
+          .order("name");
+
+        setAssistants(assistantsData || []);
+      } catch (error) {
+        console.error("Error loading filter options:", error);
+      }
+    };
+
+    loadOptions();
+  }, []);
+
+  // Update assistants when clinic changes
+  useEffect(() => {
+    const loadAssistantsByClinic = async () => {
+      if (!selectedClinic) {
+        const { data } = await supabase
+          .from("assistants")
+          .select("id, name")
+          .order("name");
+        setAssistants(data || []);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("assistants")
+        .select("id, name")
+        .eq("clinic_id", selectedClinic)
+        .order("name");
+
+      setAssistants(data || []);
+    };
+
+    loadAssistantsByClinic();
+  }, [selectedClinic]);
+
   useEffect(() => {
     const fetchMetricsData = async () => {
       try {
         setLoading(true);
 
-        // Fetch all calls with their scores and relationships
-        const { data: calls } = await supabase.from("calls").select(`
+        // Build the query with filters
+        let query = supabase.from("calls").select(`
             *,
             assistant:assistant_id(name),
             clinic:clinic_id(name)
           `);
+
+        // Apply filters
+        if (selectedClinic) {
+          query = query.eq("clinic_id", selectedClinic);
+        }
+        if (selectedAssistant) {
+          query = query.eq("assistant_id", selectedAssistant);
+        }
+        if (startDate) {
+          query = query.gte("created_at", startDate);
+        }
+        if (endDate) {
+          query = query.lte("created_at", endDate);
+        }
+
+        const { data: calls } = await query;
 
         if (!calls) return;
 
@@ -249,7 +344,14 @@ export function DashboardMetrics() {
     };
 
     fetchMetricsData();
-  }, []);
+  }, [selectedClinic, selectedAssistant, startDate, endDate]);
+
+  const handleReset = () => {
+    setSelectedClinic(null);
+    setSelectedAssistant(null);
+    setStartDate("");
+    setEndDate("");
+  };
 
   if (loading) {
     return <div>Loading metrics...</div>;
@@ -257,6 +359,82 @@ export function DashboardMetrics() {
 
   return (
     <div className="space-y-6">
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="relative">
+                <Select
+                  value={selectedClinic || "all"}
+                  onValueChange={(value) =>
+                    setSelectedClinic(value === "all" ? null : value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Clinic" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Clinics</SelectItem>
+                    {clinics.map((clinic) => (
+                      <SelectItem key={clinic.id} value={clinic.id}>
+                        {clinic.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Select
+                  value={selectedAssistant || "all"}
+                  onValueChange={(value) =>
+                    setSelectedAssistant(value === "all" ? null : value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Assistant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Assistants</SelectItem>
+                    {assistants.map((assistant) => (
+                      <SelectItem key={assistant.id} value={assistant.id}>
+                        {assistant.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <div className="relative flex-1">
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="pl-10"
+                />
+                <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              </div>
+              <span>-</span>
+              <div className="relative flex-1">
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="pl-10"
+                />
+                <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              </div>
+              <Button onClick={handleReset} variant="outline" className="w-20">
+                Clear
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Global KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>

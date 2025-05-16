@@ -1,0 +1,56 @@
+# Solum Health QA Platform
+
+Built with Next.js \*\* using the App Router, TypeScript, TailwindCSS, and ShadCN UI. It is deployed on Vercel.
+
+## Database schema (Every remember this schemas when you doing some with supabase)
+
+- The definitions of table supabase db it's in `docs/supabase/*` on files md
+
+## 🧠 Goal
+
+To build a **QA dashboard** for AI-assisted phone calls in healthcare. Both **human evaluators** and **LLM models** assess the calls. The platform must:
+
+- Display all calls, organized by clinic and agent type (inbound/outbound)
+- Allow QA to listen to audio recordings (via public URLs)
+- Show LLM and human evaluations side-by-side
+- Let QA register or edit human evaluations (with validation)
+- Detect discrepancies between human and LLM scores
+- Track key metrics over time (agent, clinic, company level)
+- Use n8n to sync data from Google Sheets (multi-sheet per clinic)
+- Use LLMs to dynamically map and normalize varying spreadsheet formats
+
+Built with:
+
+- Next.js 15 + App Router
+- TailwindCSS for styling
+- ShadCN UI for components
+- Deployed with docker
+
+Key routes:
+
+- `/calls`: call list with filters, agent/clinic tags, and audio playback
+- `/calls/[id]`: detailed call view with editable human evaluation and LLM comparison
+- `/dashboard`: call metrics, success rate, discrepancy %, etc.
+
+Features:
+
+- Realtime updates via Supabase if needed
+- Evaluation form with validations (e.g., comment required if score < 3)
+- Visual indicators for discrepancies between human and LLM scores
+
+Notes:
+
+- Not expose envs on execution time or build time.
+- The package manager is pnpm
+- The backend is a supabase with `supabase-js` as a client.
+- This client should be setup on `@/lib/supabase`
+
+## 📌 Notes
+
+- All QA users have access to all clinics
+- Authentication is email + password (handled by Supabase)
+- Calls are streamed from remote URLs using the `<audio>` tag
+- LLM evaluations are read-only
+- Human evaluations are editable
+- Google Sheets ingestion and sync handled entirely by n8n
+- Dynamic schema mapping via LLM prevents hardcoding import logic

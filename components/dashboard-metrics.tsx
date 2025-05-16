@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { CallsFilter, FilterParams } from "@/components/calls-filter";
 
 type MetricsData = {
   totalCalls: number;
@@ -143,49 +144,41 @@ export function DashboardMetrics() {
     loadAssistantsByClinic();
   }, [selectedClinic]);
 
-  useEffect(() => {
-    const fetchMetricsData = async () => {
-      try {
-        setLoading(true);
+  const handleFilter = async (filters: FilterParams) => {
+    try {
+      setLoading(true);
+      const url = new URL("/api/metrics", window.location.origin);
 
-        const url = new URL("/api/metrics", window.location.origin);
-        if (selectedClinic) {
-          url.searchParams.set("clinicId", selectedClinic);
-        }
-        if (selectedAssistant) {
-          url.searchParams.set("assistantId", selectedAssistant);
-        }
-        if (startDate) {
-          url.searchParams.set("startDate", startDate);
-        }
-        if (endDate) {
-          url.searchParams.set("endDate", endDate);
-        }
+      // Add filter params
+      if (filters.clinic_id)
+        url.searchParams.set("clinicId", filters.clinic_id);
+      if (filters.assistant_id)
+        url.searchParams.set("assistantId", filters.assistant_id);
+      if (filters.start_date)
+        url.searchParams.set("startDate", filters.start_date);
+      if (filters.end_date) url.searchParams.set("endDate", filters.end_date);
+      if (filters.search_query)
+        url.searchParams.set("search", filters.search_query);
 
-        const response = await fetch(url);
-        const data = await response.json();
+      const response = await fetch(url);
+      const data = await response.json();
 
-        if (data.error) {
-          throw new Error(data.error);
-        }
-
-        setMetricsData(data);
-      } catch (error) {
-        console.error("Error fetching metrics data:", error);
-      } finally {
-        setLoading(false);
+      if (data.error) {
+        throw new Error(data.error);
       }
-    };
 
-    fetchMetricsData();
-  }, [selectedClinic, selectedAssistant, startDate, endDate]);
-
-  const handleReset = () => {
-    setSelectedClinic(null);
-    setSelectedAssistant(null);
-    setStartDate("");
-    setEndDate("");
+      setMetricsData(data);
+    } catch (error) {
+      console.error("Error loading metrics:", error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Initial load
+  useEffect(() => {
+    handleFilter({});
+  }, []);
 
   if (loading) {
     return <div>Loading metrics...</div>;
@@ -194,80 +187,7 @@ export function DashboardMetrics() {
   return (
     <div className="space-y-6 w-full">
       {/* Filters */}
-      <Card className="w-full">
-        <CardContent className="p-4">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <Select
-                  value={selectedClinic || "all"}
-                  onValueChange={(value) =>
-                    setSelectedClinic(value === "all" ? null : value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Clinic" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Clinics</SelectItem>
-                    {clinics.map((clinic) => (
-                      <SelectItem key={clinic.id} value={clinic.id}>
-                        {clinic.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Select
-                  value={selectedAssistant || "all"}
-                  onValueChange={(value) =>
-                    setSelectedAssistant(value === "all" ? null : value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Assistant" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Assistants</SelectItem>
-                    {assistants.map((assistant) => (
-                      <SelectItem key={assistant.id} value={assistant.id}>
-                        {assistant.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <div className="relative flex-1">
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="pl-10"
-                />
-                <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              </div>
-              <span>-</span>
-              <div className="relative flex-1">
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="pl-10"
-                />
-                <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              </div>
-              <Button onClick={handleReset} variant="outline" className="w-20">
-                Clear
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <CallsFilter onFilter={handleFilter} />
 
       {/* Global KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

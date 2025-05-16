@@ -20,6 +20,7 @@ export type FilterParams = {
   start_date?: string;
   end_date?: string;
   search_query?: string;
+  evaluation_status?: "pending" | "evaluated" | "all";
 };
 
 type Clinic = {
@@ -58,6 +59,9 @@ export function CallsFilter({
   const [searchQuery, setSearchQuery] = useState<string>(
     initialFilters.search_query || ""
   );
+  const [evaluationStatus, setEvaluationStatus] = useState<
+    "pending" | "evaluated" | "all"
+  >(initialFilters.evaluation_status || "all");
 
   useEffect(() => {
     const loadOptions = async () => {
@@ -119,6 +123,9 @@ export function CallsFilter({
       ...(startDate && { start_date: startDate }),
       ...(endDate && { end_date: endDate }),
       ...(searchQuery && { search_query: searchQuery }),
+      ...(evaluationStatus !== "all" && {
+        evaluation_status: evaluationStatus,
+      }),
     };
 
     onFilter(filters);
@@ -130,6 +137,7 @@ export function CallsFilter({
     setStartDate("");
     setEndDate("");
     setSearchQuery("");
+    setEvaluationStatus("all");
     onFilter({});
   };
 
@@ -137,7 +145,7 @@ export function CallsFilter({
     <Card>
       <CardContent className="p-4">
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <Select
                 value={selectedClinic || "all"}
@@ -178,6 +186,24 @@ export function CallsFilter({
                       {assistant.name}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Select
+                value={evaluationStatus}
+                onValueChange={(value: "pending" | "evaluated" | "all") =>
+                  setEvaluationStatus(value)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Evaluation Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Calls</SelectItem>
+                  <SelectItem value="pending">Pending Evaluation</SelectItem>
+                  <SelectItem value="evaluated">Evaluated</SelectItem>
                 </SelectContent>
               </Select>
             </div>

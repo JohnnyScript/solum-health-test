@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const searchTerm = searchParams.get("search");
+    const evaluationStatus = searchParams.get("evaluationStatus");
     const sortBy = searchParams.get("sortBy") || "call_start_time";
     const sortOrder = (searchParams.get("sortOrder") || "desc") as
       | "asc"
@@ -50,6 +51,11 @@ export async function GET(request: Request) {
         assistant.name.ilike.%${searchTerm}%,
         clinic.name.ilike.%${searchTerm}%
       `);
+    }
+    if (evaluationStatus === "pending") {
+      query = query.is("evaluation_score_human", null);
+    } else if (evaluationStatus === "evaluated") {
+      query = query.not("evaluation_score_human", "is", null);
     }
 
     // Apply sorting

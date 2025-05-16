@@ -117,6 +117,8 @@ export function CallsTable() {
       if (filters.end_date) url.searchParams.set("endDate", filters.end_date);
       if (filters.search_query)
         url.searchParams.set("search", filters.search_query);
+      if (filters.evaluation_status && filters.evaluation_status !== "all")
+        url.searchParams.set("evaluationStatus", filters.evaluation_status);
 
       // Add sorting params
       url.searchParams.set("sortBy", sortBy);

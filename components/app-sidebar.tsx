@@ -1,8 +1,16 @@
-"use client"
+"use client";
 
-import { BarChart3, Home, Phone, Settings, User, Building2, LogOut } from "lucide-react"
-import { usePathname } from "next/navigation"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  BarChart3,
+  Home,
+  Phone,
+  Settings,
+  User,
+  Building2,
+  LogOut,
+} from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sidebar,
   SidebarContent,
@@ -12,10 +20,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 export function AppSidebar() {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   const routes = [
     {
@@ -30,36 +38,36 @@ export function AppSidebar() {
       href: "/calls",
       active: pathname === "/calls" || pathname.startsWith("/calls/"),
     },
-    {
-      title: "Métricas",
-      icon: BarChart3,
-      href: "/metrics",
-      active: pathname === "/metrics",
-    },
-    {
-      title: "Clínicas",
-      icon: Building2,
-      href: "/clinics",
-      active: pathname === "/clinics",
-    },
-    {
-      title: "Agentes",
-      icon: User,
-      href: "/agents",
-      active: pathname === "/agents",
-    },
-    {
-      title: "Configuración",
-      icon: Settings,
-      href: "/settings",
-      active: pathname === "/settings",
-    },
-  ]
+    // {
+    //   title: "Métricas",
+    //   icon: BarChart3,
+    //   href: "/metrics",
+    //   active: pathname === "/metrics",
+    // },
+    // {
+    //   title: "Clínicas",
+    //   icon: Building2,
+    //   href: "/clinics",
+    //   active: pathname === "/clinics",
+    // },
+    // {
+    //   title: "Agentes",
+    //   icon: User,
+    //   href: "/agents",
+    //   active: pathname === "/agents",
+    // },
+    // {
+    //   title: "Configuración",
+    //   icon: Settings,
+    //   href: "/settings",
+    //   active: pathname === "/settings",
+    // },
+  ];
 
   return (
     <Sidebar>
       <SidebarHeader className="flex items-center justify-center py-4">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 py-4">
           <div className="rounded-md bg-primary p-1">
             <Phone className="h-6 w-6 text-primary-foreground" />
           </div>
@@ -92,7 +100,9 @@ export function AppSidebar() {
               </Avatar>
               <div>
                 <p className="text-sm font-medium">Analista QA</p>
-                <p className="text-xs text-muted-foreground">analista@solumhealth.com</p>
+                <p className="text-xs text-muted-foreground">
+                  analista@solumhealth.com
+                </p>
               </div>
             </div>
             <button className="rounded-full p-2 hover:bg-muted">
@@ -102,5 +112,5 @@ export function AppSidebar() {
         </div>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

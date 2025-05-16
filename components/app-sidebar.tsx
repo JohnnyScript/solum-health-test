@@ -22,38 +22,30 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import Image from "next/image";
-
+import { useMemo } from "react";
 export function AppSidebar() {
   const pathname = usePathname();
 
-  const routes = [
-    {
-      title: "Dashboard",
-      icon: Home,
-      href: "/",
-      active: pathname === "/",
-    },
-    {
-      title: "Calls",
-      icon: Phone,
-      href: "/calls",
-      active: pathname === "/calls" || pathname.startsWith("/calls/"),
-    },
-  ];
+  const routes = useMemo(
+    () => [
+      {
+        title: "Dashboard",
+        icon: Home,
+        href: "/",
+        active: pathname === "/",
+      },
+      {
+        title: "Calls",
+        icon: Phone,
+        href: "/calls",
+        active: pathname === "/calls" || pathname.startsWith("/calls/"),
+      },
+    ],
+    [pathname]
+  );
 
-  return (
-    <Sidebar>
-      <SidebarHeader className="flex items-center justify-center py-4">
-        <div className="flex items-center space-x-2 py-4">
-          <Image
-            src="/solum.png"
-            alt="Solum Health Logo"
-            width={200}
-            height={200}
-          />
-        </div>
-      </SidebarHeader>
-      <SidebarSeparator />
+  const RenderedRoutes = useMemo(() => {
+    return (
       <SidebarContent>
         <SidebarMenu>
           {routes.map((route) => (
@@ -68,6 +60,23 @@ export function AppSidebar() {
           ))}
         </SidebarMenu>
       </SidebarContent>
+    );
+  }, [routes]);
+
+  return (
+    <Sidebar>
+      <SidebarHeader className="flex items-center justify-center py-4">
+        <div className="flex items-center space-x-2 py-4">
+          <Image
+            src="/solum.png"
+            alt="Solum Health Logo"
+            width={200}
+            height={200}
+          />
+        </div>
+      </SidebarHeader>
+      <SidebarSeparator />
+      {RenderedRoutes}
       <SidebarFooter>
         <SidebarSeparator />
         <div className="p-4">

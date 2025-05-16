@@ -32,7 +32,7 @@ import { useRouter } from "next/navigation";
 type Call = {
   id: string;
   call_id: string;
-  created_at: string;
+  call_start_time: string;
   transcript: string;
   evaluation_score_human: number | null;
   evaluation_score_llm: number | null;
@@ -342,10 +342,11 @@ export function CallsTable() {
               </TableHead>
               <TableHead
                 className="cursor-pointer"
-                onClick={() => handleSort("created_at")}
+                onClick={() => handleSort("call_start_time")}
               >
                 Date{" "}
-                {sortBy === "created_at" && (sortOrder === "asc" ? "↑" : "↓")}
+                {sortBy === "call_start_time" &&
+                  (sortOrder === "asc" ? "↑" : "↓")}
               </TableHead>
               <TableHead>Clinic</TableHead>
               <TableHead>Assistant</TableHead>
@@ -359,7 +360,7 @@ export function CallsTable() {
               <TableRow key={call.id}>
                 <TableCell>{call.call_id}</TableCell>
                 <TableCell>
-                  {format(new Date(call.created_at), "PPP")}
+                  {format(new Date(call.call_start_time), "PPP")}
                 </TableCell>
                 <TableCell>{call.clinic.name}</TableCell>
                 <TableCell>{call.assistant.name}</TableCell>

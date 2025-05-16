@@ -66,6 +66,7 @@ export function CallsTable() {
   const [loading, setLoading] = useState(true);
   const [totalCalls, setTotalCalls] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [currentFilters, setCurrentFilters] = useState<FilterParams>({});
 
   // State for pagination and sorting
   const [currentPage, setCurrentPage] = useState(1);
@@ -99,6 +100,7 @@ export function CallsTable() {
   const handleFilter = async (filters: FilterParams) => {
     try {
       setLoading(true);
+      setCurrentFilters(filters);
       const url = new URL("/api/calls", window.location.origin);
 
       // Add pagination params
@@ -159,7 +161,7 @@ export function CallsTable() {
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <CallsFilter onFilter={handleFilter} />
+      <CallsFilter onFilter={handleFilter} initialFilters={currentFilters} />
 
       {/* Table */}
       <div className="rounded-md border">

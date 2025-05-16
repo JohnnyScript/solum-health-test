@@ -12,7 +12,6 @@ import {
   Calendar,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import {
   LineChart,
   Line,
@@ -102,19 +101,15 @@ export function DashboardMetrics() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const { data: clinicsData } = await supabase
-          .from("clinics")
-          .select("id, name")
-          .order("name");
+        const response = await fetch("/api/options");
+        const data = await response.json();
 
-        setClinics(clinicsData || []);
+        if (data.error) {
+          throw new Error(data.error);
+        }
 
-        const { data: assistantsData } = await supabase
-          .from("assistants")
-          .select("id, name")
-          .order("name");
-
-        setAssistants(assistantsData || []);
+        setClinics(data.clinics);
+        setAssistants(data.assistants);
       } catch (error) {
         console.error("Error loading filter options:", error);
       }
@@ -126,22 +121,23 @@ export function DashboardMetrics() {
   // Update assistants when clinic changes
   useEffect(() => {
     const loadAssistantsByClinic = async () => {
-      if (!selectedClinic) {
-        const { data } = await supabase
-          .from("assistants")
-          .select("id, name")
-          .order("name");
-        setAssistants(data || []);
-        return;
+      try {
+        const url = new URL("/api/options", window.location.origin);
+        if (selectedClinic) {
+          url.searchParams.set("clinicId", selectedClinic);
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        setAssistants(data.assistants);
+      } catch (error) {
+        console.error("Error loading assistants:", error);
       }
-
-      const { data } = await supabase
-        .from("assistants")
-        .select("id, name")
-        .eq("clinic_id", selectedClinic)
-        .order("name");
-
-      setAssistants(data || []);
     };
 
     loadAssistantsByClinic();
@@ -152,165 +148,28 @@ export function DashboardMetrics() {
       try {
         setLoading(true);
 
-        // Build the query with filters
-        let query = supabase.from("calls").select(`
-            *,
-            assistant:assistant_id(name),
-            clinic:clinic_id(name)
-          `);
-
-        // Apply filters
+        const url = new URL("/api/metrics", window.location.origin);
         if (selectedClinic) {
-          query = query.eq("clinic_id", selectedClinic);
+          url.searchParams.set("clinicId", selectedClinic);
         }
         if (selectedAssistant) {
-          query = query.eq("assistant_id", selectedAssistant);
+          url.searchParams.set("assistantId", selectedAssistant);
         }
         if (startDate) {
-          query = query.gte("created_at", startDate);
+          url.searchParams.set("startDate", startDate);
         }
         if (endDate) {
-          query = query.lte("created_at", endDate);
+          url.searchParams.set("endDate", endDate);
         }
 
-        const { data: calls } = await query;
+        const response = await fetch(url);
+        const data = await response.json();
 
-        if (!calls) return;
+        if (data.error) {
+          throw new Error(data.error);
+        }
 
-        // Calculate basic metrics
-        const totalCalls = calls.length;
-        const evaluatedCalls = calls.filter((call) => call.evaluated);
-        const callsWithBothScores = calls.filter(
-          (call) => call.evaluation_score_human && call.evaluation_score_llm
-        );
-
-        // Calculate KPIs
-        const successRate =
-          calls.filter((call) => (call.evaluation_score_human || 0) >= 3)
-            .length / totalCalls;
-        const avgHumanScore =
-          calls.reduce(
-            (acc, call) => acc + (call.evaluation_score_human || 0),
-            0
-          ) / totalCalls;
-        const avgLLMScore =
-          calls.reduce(
-            (acc, call) => acc + (call.evaluation_score_llm || 0),
-            0
-          ) / totalCalls;
-        const evaluatedRate = evaluatedCalls.length / totalCalls;
-
-        // Calculate discrepancy metrics
-        const scoreDifferences = callsWithBothScores.map((call) =>
-          Math.abs(
-            (call.evaluation_score_human || 0) -
-              (call.evaluation_score_llm || 0)
-          )
-        );
-        const avgScoreDifference =
-          scoreDifferences.reduce((acc, diff) => acc + diff, 0) /
-          scoreDifferences.length;
-        const highDiscrepancyRate =
-          callsWithBothScores.filter(
-            (call) =>
-              Math.abs(
-                (call.evaluation_score_human || 0) -
-                  (call.evaluation_score_llm || 0)
-              ) >= 2
-          ).length / callsWithBothScores.length;
-
-        // Process scores over time
-        const scoresOverTime = Array.from(
-          new Set(
-            calls.map(
-              (call) =>
-                new Date(call.created_at || "").toISOString().split("T")[0]
-            )
-          )
-        )
-          .map((date) => {
-            const daysCalls = calls.filter(
-              (call) =>
-                new Date(call.created_at || "").toISOString().split("T")[0] ===
-                date
-            );
-            return {
-              date,
-              humanScore:
-                daysCalls.reduce(
-                  (acc, call) => acc + (call.evaluation_score_human || 0),
-                  0
-                ) / daysCalls.length,
-              llmScore:
-                daysCalls.reduce(
-                  (acc, call) => acc + (call.evaluation_score_llm || 0),
-                  0
-                ) / daysCalls.length,
-            };
-          })
-          .sort((a, b) => a.date.localeCompare(b.date));
-
-        // Process scores by assistant
-        const assistantScores = new Map<
-          string,
-          { total: number; count: number }
-        >();
-        calls.forEach((call) => {
-          if (call.assistant?.name && call.evaluation_score_human) {
-            const current = assistantScores.get(call.assistant.name) || {
-              total: 0,
-              count: 0,
-            };
-            assistantScores.set(call.assistant.name, {
-              total: current.total + call.evaluation_score_human,
-              count: current.count + 1,
-            });
-          }
-        });
-        const scoresByAssistant = Array.from(assistantScores.entries()).map(
-          ([name, stats]) => ({
-            name,
-            avgScore: stats.total / stats.count,
-          })
-        );
-
-        // Process scores by clinic
-        const clinicScores = new Map<
-          string,
-          { total: number; count: number }
-        >();
-        calls.forEach((call) => {
-          if (call.clinic?.name && call.evaluation_score_human) {
-            const current = clinicScores.get(call.clinic.name) || {
-              total: 0,
-              count: 0,
-            };
-            clinicScores.set(call.clinic.name, {
-              total: current.total + call.evaluation_score_human,
-              count: current.count + 1,
-            });
-          }
-        });
-        const scoresByClinic = Array.from(clinicScores.entries()).map(
-          ([name, stats]) => ({
-            name,
-            avgScore: stats.total / stats.count,
-          })
-        );
-        console.log("scoresByClinic", scoresByClinic);
-
-        setMetricsData({
-          totalCalls,
-          successRate,
-          avgHumanScore,
-          avgLLMScore,
-          evaluatedRate,
-          avgScoreDifference,
-          highDiscrepancyRate,
-          scoresOverTime,
-          scoresByAssistant,
-          scoresByClinic,
-        });
+        setMetricsData(data);
       } catch (error) {
         console.error("Error fetching metrics data:", error);
       } finally {

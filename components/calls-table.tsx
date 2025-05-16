@@ -10,347 +10,399 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Eye, ChevronLeft, ChevronRight, ArrowUpDown } from "lucide-react";
-import { formatDuration, formatDate } from "@/lib/utils";
-import { supabase, type Call } from "@/lib/supabase";
-import { CallsFilter, type FilterParams } from "@/components/calls-filter";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Card, CardContent } from "./ui/card";
+import { useRouter } from "next/navigation";
+type Call = {
+  id: string;
+  call_id: string;
+  created_at: string;
+  transcript: string;
+  evaluation_score_human: number | null;
+  evaluation_score_llm: number | null;
+  assistant: {
+    id: string;
+    name: string;
+  };
+  clinic: {
+    id: string;
+    name: string;
+  };
+};
 
-const ITEMS_PER_PAGE = 10;
+type Clinic = {
+  id: string;
+  name: string;
+};
 
-type SortField =
-  | "call_start_time"
-  | "assistant.name"
-  | "clinic.name"
-  | "duration"
-  | "evaluation_score_human"
-  | "evaluation_score_llm"
-  | "agent_type";
-type SortOrder = "asc" | "desc";
+type Assistant = {
+  id: string;
+  name: string;
+};
 
 export function CallsTable() {
+  // State for data
   const [calls, setCalls] = useState<Call[]>([]);
+  const [clinics, setClinics] = useState<Clinic[]>([]);
+  const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [sortField, setSortField] = useState<SortField>("call_start_time");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [filters, setFilters] = useState<FilterParams>({});
+  const [totalCalls, setTotalCalls] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
-  const fetchCalls = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Construir la consulta base
-      let query = supabase.from("calls").select(
-        `
-          *,
-          clinic:clinics(name),
-          assistant:assistants(name)
-        `
-      );
-
-      // Aplicar filtros
-      if (filters.clinic_id) {
-        query = query.eq("clinic_id", filters.clinic_id);
-      }
-      if (filters.assistant_id) {
-        query = query.eq("assistant_id", filters.assistant_id);
-      }
-      if (filters.start_date) {
-        query = query.gte("call_start_time", filters.start_date);
-      }
-      if (filters.end_date) {
-        query = query.lte("call_start_time", filters.end_date);
-      }
-      if (filters.search_query) {
-        query = query.or(
-          `call_id.ilike.%${filters.search_query}%,phone_number.ilike.%${filters.search_query}%`
-        );
-      }
-
-      // Obtener el conteo total con los filtros aplicados
-      const countQuery = supabase
-        .from("calls")
-        .select("*", { count: "exact", head: true });
-
-      // Aplicar los mismos filtros a la consulta de conteo
-      if (filters.clinic_id) {
-        countQuery.eq("clinic_id", filters.clinic_id);
-      }
-      if (filters.assistant_id) {
-        countQuery.eq("assistant_id", filters.assistant_id);
-      }
-      if (filters.start_date) {
-        countQuery.gte("call_start_time", filters.start_date);
-      }
-      if (filters.end_date) {
-        countQuery.lte("call_start_time", filters.end_date);
-      }
-      if (filters.search_query) {
-        countQuery.or(
-          `call_id.ilike.%${filters.search_query}%,phone_number.ilike.%${filters.search_query}%`
-        );
-      }
-
-      const { count } = await countQuery;
-      setTotalCount(count || 0);
-
-      // Obtener los datos paginados y ordenados
-      const { data, error } = await query
-        .order(sortField, { ascending: sortOrder === "asc" })
-        .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1);
-
-      if (error) throw error;
-      setCalls(data || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // State for filters and pagination
+  const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
+  const [selectedAssistant, setSelectedAssistant] = useState<string | null>(
+    null
+  );
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [sortBy, setSortBy] = useState("created_at");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const router = useRouter();
+  // Load clinics and assistants
   useEffect(() => {
-    fetchCalls();
-  }, [page, sortField, sortOrder, filters]);
+    const loadOptions = async () => {
+      try {
+        const response = await fetch("/api/options");
+        const data = await response.json();
 
-  const handleFilter = (newFilters: FilterParams) => {
-    setPage(1); // Resetear la página al aplicar nuevos filtros
-    setFilters(newFilters);
-  };
+        if (data.error) {
+          throw new Error(data.error);
+        }
 
-  const handleSort = (field: SortField) => {
-    if (field === sortField) {
+        setClinics(data.clinics);
+        setAssistants(data.assistants);
+      } catch (error) {
+        console.error("Error loading options:", error);
+      }
+    };
+
+    loadOptions();
+  }, []);
+
+  // Update assistants when clinic changes
+  useEffect(() => {
+    const loadAssistantsByClinic = async () => {
+      try {
+        const url = new URL("/api/options", window.location.origin);
+        if (selectedClinic) {
+          url.searchParams.set("clinicId", selectedClinic);
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        setAssistants(data.assistants);
+      } catch (error) {
+        console.error("Error loading assistants:", error);
+      }
+    };
+
+    loadAssistantsByClinic();
+  }, [selectedClinic]);
+
+  // Load calls data
+  useEffect(() => {
+    const loadCalls = async () => {
+      try {
+        setLoading(true);
+        const url = new URL("/api/calls", window.location.origin);
+
+        // Add pagination params
+        url.searchParams.set("page", currentPage.toString());
+        url.searchParams.set("pageSize", pageSize.toString());
+
+        // Add filter params
+        if (selectedClinic) url.searchParams.set("clinicId", selectedClinic);
+        if (selectedAssistant)
+          url.searchParams.set("assistantId", selectedAssistant);
+        if (startDate)
+          url.searchParams.set("startDate", startDate.toISOString());
+        if (endDate) url.searchParams.set("endDate", endDate.toISOString());
+        if (searchTerm) url.searchParams.set("search", searchTerm);
+
+        // Add sorting params
+        url.searchParams.set("sortBy", sortBy);
+        url.searchParams.set("sortOrder", sortOrder);
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        setCalls(data.calls);
+        setTotalCalls(data.totalCalls);
+        setTotalPages(data.totalPages);
+      } catch (error) {
+        console.error("Error loading calls:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCalls();
+  }, [
+    currentPage,
+    pageSize,
+    selectedClinic,
+    selectedAssistant,
+    startDate,
+    endDate,
+    searchTerm,
+    sortBy,
+    sortOrder,
+  ]);
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
-      setSortField(field);
+      setSortBy(column);
       setSortOrder("asc");
     }
   };
 
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
-
-  const getScoreColor = (score: number | null) => {
-    if (!score) return "secondary";
-    if (score > 80) return "default";
-    if (score < 50) return "destructive";
-    return "secondary";
+  const handleReset = () => {
+    setSelectedClinic(null);
+    setSelectedAssistant(null);
+    setStartDate(null);
+    setEndDate(null);
+    setSearchTerm("");
+    setCurrentPage(1);
+    setSortBy("created_at");
+    setSortOrder("desc");
   };
 
-  const getEvaluationStatus = (call: Call) => {
-    if (call.evaluation_score_human && call.evaluation_score_llm) {
-      return {
-        label: "Evaluated",
-        color: "default" as const,
-        textColor: "text-green-600",
-      };
-    }
-    if (call.evaluation_score_human) {
-      return {
-        label: "In Progress",
-        color: "secondary" as const,
-        textColor: "text-blue-600",
-      };
-    }
-    return {
-      label: "Pending",
-      color: "destructive" as const,
-      textColor: "text-red-600",
-    };
-  };
-
-  const getCallTypeColor = (type: Call["agent_type"]) => {
-    return type === "inbound" ? "default" : "secondary";
-  };
-
-  if (error) {
-    return (
-      <div className="rounded-md border p-4 text-red-600">Error: {error}</div>
-    );
+  if (loading) {
+    return <div>Loading calls...</div>;
   }
 
   return (
     <div className="space-y-4">
-      <CallsFilter onFilter={handleFilter} />
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <Select
+                  value={selectedClinic || undefined}
+                  onValueChange={(value) => {
+                    setSelectedClinic(value === "all" ? null : value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Clinic" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Clinics</SelectItem>
+                    {clinics.map((clinic) => (
+                      <SelectItem key={clinic.id} value={clinic.id}>
+                        {clinic.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
+              <div>
+                <Select
+                  value={selectedAssistant || undefined}
+                  onValueChange={(value) => {
+                    setSelectedAssistant(value === "all" ? null : value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Assistant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Assistants</SelectItem>
+                    {assistants.map((assistant) => (
+                      <SelectItem key={assistant.id} value={assistant.id}>
+                        {assistant.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !startDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {startDate ? format(startDate, "PPP") : "Start Date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={startDate || undefined}
+                      onSelect={(date) => {
+                        setStartDate(date || null);
+                        setCurrentPage(1);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !endDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(endDate, "PPP") : "End Date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={endDate || undefined}
+                      onSelect={(date) => {
+                        setEndDate(date || null);
+                        setCurrentPage(1);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <Input
+                placeholder="Search calls..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="max-w-sm"
+              />
+              <Button onClick={handleReset} variant="outline">
+                Reset Filters
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort("call_start_time")}
-                  className="flex items-center gap-1"
-                >
-                  Date
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
+              <TableHead
+                className="cursor-pointer"
+                onClick={() => handleSort("call_id")}
+              >
+                Call ID{" "}
+                {sortBy === "call_id" && (sortOrder === "asc" ? "↑" : "↓")}
               </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort("assistant.name")}
-                  className="flex items-center gap-1"
-                >
-                  Assistant
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
+              <TableHead
+                className="cursor-pointer"
+                onClick={() => handleSort("created_at")}
+              >
+                Date{" "}
+                {sortBy === "created_at" && (sortOrder === "asc" ? "↑" : "↓")}
               </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort("clinic.name")}
-                  className="flex items-center gap-1"
-                >
-                  Clinic
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort("agent_type")}
-                  className="flex items-center gap-1"
-                >
-                  Type
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort("duration")}
-                  className="flex items-center gap-1"
-                >
-                  Duration
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort("evaluation_score_human")}
-                  className="flex items-center gap-1"
-                >
-                  QA Score
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  onClick={() => handleSort("evaluation_score_llm")}
-                  className="flex items-center gap-1"
-                >
-                  LLM Score
-                  <ArrowUpDown className="h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>Clinic</TableHead>
+              <TableHead>Assistant</TableHead>
+              <TableHead>Human Score</TableHead>
+              <TableHead>LLM Score</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-4">
-                  Loading...
+            {calls.map((call) => (
+              <TableRow key={call.id}>
+                <TableCell>{call.call_id}</TableCell>
+                <TableCell>
+                  {format(new Date(call.created_at), "PPP")}
+                </TableCell>
+                <TableCell>{call.clinic.name}</TableCell>
+                <TableCell>{call.assistant.name}</TableCell>
+                <TableCell>{call.evaluation_score_human || "-"}</TableCell>
+                <TableCell>{call.evaluation_score_llm || "-"}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      router.push(`/calls/${call.id}`);
+                    }}
+                  >
+                    View
+                  </Button>
                 </TableCell>
               </TableRow>
-            ) : calls.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-4">
-                  No calls to display
-                </TableCell>
-              </TableRow>
-            ) : (
-              calls.map((call) => (
-                <TableRow key={call.id}>
-                  <TableCell>
-                    <div className="font-medium">
-                      {call.call_start_time
-                        ? formatDate(call.call_start_time)
-                        : "N/A"}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {call.call_start_time
-                        ? new Date(call.call_start_time).toLocaleTimeString()
-                        : ""}
-                    </div>
-                  </TableCell>
-                  <TableCell>{call.assistant?.name || "N/A"}</TableCell>
-                  <TableCell>{call.clinic?.name || "N/A"}</TableCell>
-                  <TableCell>
-                    <Badge variant={getCallTypeColor(call.agent_type)}>
-                      {call.agent_type === "inbound" ? "Inbound" : "Outbound"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {call.duration ? formatDuration(call.duration) : "N/A"}
-                  </TableCell>
-                  <TableCell>
-                    <div className={getEvaluationStatus(call).textColor}>
-                      <Badge variant={getEvaluationStatus(call).color}>
-                        {getEvaluationStatus(call).label}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {call.evaluation_score_human && (
-                      <Badge
-                        variant={getScoreColor(call.evaluation_score_human)}
-                      >
-                        {`${call.evaluation_score_human}%`}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {call.evaluation_score_llm && (
-                      <Badge variant={getScoreColor(call.evaluation_score_llm)}>
-                        {`${call.evaluation_score_llm}%`}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" asChild>
-                      <a href={`/calls/${call.id}`}>
-                        <Eye className="h-4 w-4" />
-                        <span className="sr-only">View details</span>
-                      </a>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+            ))}
           </TableBody>
         </Table>
       </div>
 
+      {/* Pagination */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          Showing {calls.length} of {totalCount} calls
+          Showing {calls.length} of {totalCalls} calls
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex gap-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1 || loading}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
           >
-            <ChevronLeft className="h-4 w-4" />
             Previous
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages || loading}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
           >
             Next
-            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>

@@ -21,6 +21,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import Image from "next/image";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -38,40 +39,18 @@ export function AppSidebar() {
       href: "/calls",
       active: pathname === "/calls" || pathname.startsWith("/calls/"),
     },
-    // {
-    //   title: "Metrics",
-    //   icon: BarChart3,
-    //   href: "/metrics",
-    //   active: pathname === "/metrics",
-    // },
-    {
-      title: "Clinics",
-      icon: Building2,
-      href: "/clinics",
-      active: pathname === "/clinics",
-    },
-    {
-      title: "Assistants",
-      icon: User,
-      href: "/assistants",
-      active: pathname === "/assistants",
-    },
-    // {
-    //   title: "Settings",
-    //   icon: Settings,
-    //   href: "/settings",
-    //   active: pathname === "/settings",
-    // },
   ];
 
   return (
     <Sidebar>
       <SidebarHeader className="flex items-center justify-center py-4">
         <div className="flex items-center space-x-2 py-4">
-          <div className="rounded-md bg-primary p-1">
-            <Phone className="h-6 w-6 text-primary-foreground" />
-          </div>
-          <h1 className="text-xl font-bold">Solum Health</h1>
+          <Image
+            src="/solum.png"
+            alt="Solum Health Logo"
+            width={200}
+            height={200}
+          />
         </div>
       </SidebarHeader>
       <SidebarSeparator />

@@ -88,9 +88,7 @@ export function AppSidebar() {
               </Avatar>
               <div>
                 <p className="text-sm font-medium">QA Analyst</p>
-                <p className="text-xs text-muted-foreground">
-                  analyst@solumhealth.com
-                </p>
+                <p className="text-xs text-muted-foreground">qa@getsolum.com</p>
               </div>
             </div>
             <button className="rounded-full p-2 hover:bg-muted">

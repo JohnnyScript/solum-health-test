@@ -80,6 +80,14 @@ export function CallsTable() {
   const [sortBy, setSortBy] = useState("call_start_time");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
+  // Function to get background color class based on score
+  const getScoreColorClass = (score: number | null) => {
+    if (score === null) return "";
+    if (score < 50) return "bg-red-100 dark:bg-red-950";
+    if (score >= 50 && score <= 79) return "bg-orange-100 dark:bg-orange-950";
+    return "bg-green-100 dark:bg-green-950";
+  };
+
   // Function to update URL with current state
   const updateURL = (page: number, filters: FilterParams) => {
     const url = new URL(window.location.href);
@@ -258,8 +266,20 @@ export function CallsTable() {
                 </TableCell>
                 <TableCell>{call.clinic.name}</TableCell>
                 <TableCell>{call.assistant.name}</TableCell>
-                <TableCell>{call.evaluation_score_human || "-"}</TableCell>
-                <TableCell>{call.evaluation_score_llm || "-"}</TableCell>
+                <TableCell
+                  className={getScoreColorClass(call.evaluation_score_human)}
+                >
+                  {call.evaluation_score_human
+                    ? `${call.evaluation_score_human}%`
+                    : "-"}
+                </TableCell>
+                <TableCell
+                  className={getScoreColorClass(call.evaluation_score_llm)}
+                >
+                  {call.evaluation_score_llm
+                    ? `${call.evaluation_score_llm}%`
+                    : "-"}
+                </TableCell>
                 <TableCell>
                   <Button
                     variant="outline"

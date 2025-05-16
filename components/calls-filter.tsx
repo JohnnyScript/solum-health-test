@@ -36,11 +36,13 @@ type Assistant = {
 interface CallsFilterProps {
   onFilter: (params: FilterParams) => void;
   initialFilters?: FilterParams;
+  showStatusCallFilter?: boolean;
 }
 
 export function CallsFilter({
   onFilter,
   initialFilters = {},
+  showStatusCallFilter = true,
 }: CallsFilterProps) {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [assistants, setAssistants] = useState<Assistant[]>([]);
@@ -122,7 +124,7 @@ export function CallsFilter({
       ...(selectedAssistant && { assistant_id: selectedAssistant }),
       ...(startDate && { start_date: startDate }),
       ...(endDate && { end_date: endDate }),
-      ...(searchQuery && { search_query: searchQuery }),
+      // ...(searchQuery && { search_query: searchQuery }),
       ...(evaluationStatus !== "all" && {
         evaluation_status: evaluationStatus,
       }),
@@ -136,7 +138,7 @@ export function CallsFilter({
     setSelectedAssistant(null);
     setStartDate("");
     setEndDate("");
-    setSearchQuery("");
+    // setSearchQuery("");
     setEvaluationStatus("all");
     onFilter({});
   };
@@ -190,23 +192,25 @@ export function CallsFilter({
               </Select>
             </div>
 
-            <div>
-              <Select
-                value={evaluationStatus}
-                onValueChange={(value: "pending" | "evaluated" | "all") =>
-                  setEvaluationStatus(value)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Evaluation Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Calls</SelectItem>
-                  <SelectItem value="pending">Pending Evaluation</SelectItem>
-                  <SelectItem value="evaluated">Evaluated</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {showStatusCallFilter && (
+              <div>
+                <Select
+                  value={evaluationStatus}
+                  onValueChange={(value: "pending" | "evaluated" | "all") =>
+                    setEvaluationStatus(value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Evaluation Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Calls</SelectItem>
+                    <SelectItem value="pending">Pending Evaluation</SelectItem>
+                    <SelectItem value="evaluated">Evaluated</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center space-x-2">
@@ -232,7 +236,7 @@ export function CallsFilter({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-[1fr,auto] gap-4 items-center">
-            <div className="relative">
+            {/* <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search by ID or number"
@@ -240,7 +244,7 @@ export function CallsFilter({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
-            </div>
+            </div> */}
             <div className="flex gap-2 justify-end">
               <Button onClick={handleFilter} className="w-20">
                 Filter

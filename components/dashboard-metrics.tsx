@@ -1,66 +1,126 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Phone, Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
-// Example data for metrics
-const metricsData = {
-  totalCalls: 1245,
-  avgDuration: 180, // in seconds
-  successRate: 0.78,
-  discrepancyRate: 0.12,
-
-  // Chart data
-  callsByDay: [
-    { date: "2024-05-01", count: 42 },
-    { date: "2024-05-02", count: 38 },
-    { date: "2024-05-03", count: 45 },
-    { date: "2024-05-04", count: 32 },
-    { date: "2024-05-05", count: 30 },
-    { date: "2024-05-06", count: 48 },
-    { date: "2024-05-07", count: 50 },
-    { date: "2024-05-08", count: 47 },
-    { date: "2024-05-09", count: 55 },
-    { date: "2024-05-10", count: 60 },
-  ],
-
-  // Agent ranking data
-  agentRanking: [
-    { name: "Assistant 1", calls: 420, avgScore: 0.92 },
-    { name: "Assistant 2", calls: 385, avgScore: 0.85 },
-    { name: "Assistant 3", calls: 440, avgScore: 0.78 },
-  ],
-
-  // Clinic data
-  clinicStats: [
-    { name: "San Jose Clinic", calls: 520, avgScore: 0.88 },
-    { name: "North Medical Center", calls: 425, avgScore: 0.82 },
-    { name: "Central Hospital", calls: 300, avgScore: 0.75 },
-  ],
+type MetricsData = {
+  totalCalls: number;
+  avgDuration: number;
+  successRate: number;
+  discrepancyRate: number;
+  callsByDay: { date: string; count: number }[];
 };
 
 export function DashboardMetrics() {
+  const [metricsData, setMetricsData] = useState<MetricsData>({
+    totalCalls: 0,
+    avgDuration: 0,
+    successRate: 0,
+    discrepancyRate: 0,
+    callsByDay: [],
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMetricsData = async () => {
+      try {
+        setLoading(true);
+
+        // Fetch total calls
+        const { count: totalCalls } = await supabase
+          .from("calls")
+          .select("*", { count: "exact", head: true });
+
+        // Fetch average duration
+        const { data: durationData } = await supabase
+          .from("calls")
+          .select("duration")
+          .not("duration", "is", null);
+
+        const avgDuration = durationData
+          ? durationData.reduce((acc, curr) => acc + (curr.duration || 0), 0) /
+            durationData.length
+          : 0;
+
+        // Fetch success rate (calls with positive outcome)
+        const { count: successfulCalls } = await supabase
+          .from("calls")
+          .select("*", { count: "exact", head: true })
+          .gte("evaluation_score_human", 4);
+
+        // Fetch discrepancy rate (difference between human and LLM scores > 1)
+        const { data: callsData } = await supabase
+          .from("calls")
+          .select("evaluation_score_human, evaluation_score_llm")
+          .not("evaluation_score_human", "is", null)
+          .not("evaluation_score_llm", "is", null);
+
+        const discrepantCalls =
+          callsData?.filter(
+            (call) =>
+              Math.abs(
+                (call.evaluation_score_human || 0) -
+                  (call.evaluation_score_llm || 0)
+              ) > 1
+          ).length || 0;
+
+        // Fetch calls by day for the last 10 days
+        const { data: callsByDay } = await supabase
+          .from("calls")
+          .select("created_at")
+          .gte(
+            "created_at",
+            new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
+          )
+          .order("created_at");
+
+        // Process calls by day
+        const dailyCalls = callsByDay?.reduce(
+          (acc: { [key: string]: number }, curr) => {
+            const date = new Date(curr.created_at).toISOString().split("T")[0];
+            acc[date] = (acc[date] || 0) + 1;
+            return acc;
+          },
+          {}
+        );
+
+        const callsByDayArray = Object.entries(dailyCalls || {}).map(
+          ([date, count]) => ({
+            date,
+            count,
+          })
+        );
+
+        setMetricsData({
+          totalCalls: totalCalls || 0,
+          avgDuration,
+          successRate: totalCalls ? (successfulCalls || 0) / totalCalls : 0,
+          discrepancyRate: callsData?.length
+            ? discrepantCalls / callsData.length
+            : 0,
+          callsByDay: callsByDayArray,
+        });
+      } catch (error) {
+        console.error("Error fetching metrics data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMetricsData();
+  }, []);
+
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
-  const getScoreColor = (score: number) => {
-    if (score > 0.8) return "default";
-    if (score < 0.5) return "destructive";
-    return "secondary";
-  };
+  if (loading) {
+    return <div>Loading metrics...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -73,7 +133,9 @@ export function DashboardMetrics() {
           <CardContent>
             <div className="text-2xl font-bold">{metricsData.totalCalls}</div>
             <p className="text-xs text-muted-foreground">
-              +{metricsData.callsByDay[metricsData.callsByDay.length - 1].count}{" "}
+              +
+              {metricsData.callsByDay[metricsData.callsByDay.length - 1]
+                ?.count || 0}{" "}
               today
             </p>
           </CardContent>
@@ -124,97 +186,6 @@ export function DashboardMetrics() {
           </CardContent>
         </Card>
       </div>
-
-      <Tabs defaultValue="agents">
-        <TabsList>
-          <TabsTrigger value="agents">Agents</TabsTrigger>
-          <TabsTrigger value="clinics">Clinics</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="agents" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Agent Ranking</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Agent</TableHead>
-                    <TableHead>Calls</TableHead>
-                    <TableHead>Average Score</TableHead>
-                    <TableHead>Performance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {metricsData.agentRanking.map((agent) => (
-                    <TableRow key={agent.name}>
-                      <TableCell className="font-medium">
-                        {agent.name}
-                      </TableCell>
-                      <TableCell>{agent.calls}</TableCell>
-                      <TableCell>
-                        {(agent.avgScore * 100).toFixed(1)}%
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getScoreColor(agent.avgScore)}>
-                          {agent.avgScore > 0.8
-                            ? "Excellent"
-                            : agent.avgScore > 0.5
-                            ? "Good"
-                            : "Needs Improvement"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="clinics" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Clinic Statistics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Clinic</TableHead>
-                    <TableHead>Calls</TableHead>
-                    <TableHead>Average Score</TableHead>
-                    <TableHead>Performance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {metricsData.clinicStats.map((clinic) => (
-                    <TableRow key={clinic.name}>
-                      <TableCell className="font-medium">
-                        {clinic.name}
-                      </TableCell>
-                      <TableCell>{clinic.calls}</TableCell>
-                      <TableCell>
-                        {(clinic.avgScore * 100).toFixed(1)}%
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getScoreColor(clinic.avgScore)}>
-                          {clinic.avgScore > 0.8
-                            ? "Excellent"
-                            : clinic.avgScore > 0.5
-                            ? "Good"
-                            : "Needs Improvement"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }

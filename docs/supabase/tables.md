@@ -12,6 +12,7 @@
     duration integer null,
     call_reason text null,
     summary text null,
+    assistant_id uuid null,
     call_ended_time timestamp with time zone null,
     evaluated boolean null default false,
     qa_check boolean null default false,

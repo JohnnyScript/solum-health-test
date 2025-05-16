@@ -44,18 +44,18 @@ export function AppSidebar() {
     //   href: "/metrics",
     //   active: pathname === "/metrics",
     // },
-    // {
-    //   title: "Clinics",
-    //   icon: Building2,
-    //   href: "/clinics",
-    //   active: pathname === "/clinics",
-    // },
-    // {
-    //   title: "Agents",
-    //   icon: User,
-    //   href: "/agents",
-    //   active: pathname === "/agents",
-    // },
+    {
+      title: "Clinics",
+      icon: Building2,
+      href: "/clinics",
+      active: pathname === "/clinics",
+    },
+    {
+      title: "Assistants",
+      icon: User,
+      href: "/assistants",
+      active: pathname === "/assistants",
+    },
     // {
     //   title: "Settings",
     //   icon: Settings,

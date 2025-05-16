@@ -37,12 +37,10 @@ interface CallsFilterProps {
 }
 
 export function CallsFilter({ onFilter }: CallsFilterProps) {
-  // Estados para las opciones de los selects
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados para los valores seleccionados
   const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
   const [selectedAssistant, setSelectedAssistant] = useState<string | null>(
     null
@@ -51,13 +49,11 @@ export function CallsFilter({ onFilter }: CallsFilterProps) {
   const [endDate, setEndDate] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // Cargar clínicas y asistentes
   useEffect(() => {
     const loadOptions = async () => {
       try {
         setLoading(true);
 
-        // Cargar clínicas
         const { data: clinicsData, error: clinicsError } = await supabase
           .from("clinics")
           .select("id, name")
@@ -66,7 +62,6 @@ export function CallsFilter({ onFilter }: CallsFilterProps) {
         if (clinicsError) throw clinicsError;
         setClinics(clinicsData || []);
 
-        // Cargar asistentes
         const { data: assistantsData, error: assistantsError } = await supabase
           .from("assistants")
           .select("id, name")
@@ -84,11 +79,9 @@ export function CallsFilter({ onFilter }: CallsFilterProps) {
     loadOptions();
   }, []);
 
-  // Cargar asistentes específicos cuando se selecciona una clínica
   useEffect(() => {
     const loadAssistantsByClinic = async () => {
       if (!selectedClinic) {
-        // Si no hay clínica seleccionada, cargar todos los asistentes
         const { data } = await supabase
           .from("assistants")
           .select("id, name")
@@ -134,7 +127,6 @@ export function CallsFilter({ onFilter }: CallsFilterProps) {
     <Card>
       <CardContent className="p-4">
         <div className="space-y-4">
-          {/* Primera fila: Clínicas y Asistentes */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="relative">
               <Select
@@ -145,10 +137,10 @@ export function CallsFilter({ onFilter }: CallsFilterProps) {
                 disabled={loading}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Clínica" />
+                  <SelectValue placeholder="Clinic" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas las clínicas</SelectItem>
+                  <SelectItem value="all">All Clinics</SelectItem>
                   {clinics.map((clinic) => (
                     <SelectItem key={clinic.id} value={clinic.id}>
                       {clinic.name}
@@ -167,10 +159,10 @@ export function CallsFilter({ onFilter }: CallsFilterProps) {
                 disabled={loading}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Asistente" />
+                  <SelectValue placeholder="Assistant" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los asistentes</SelectItem>
+                  <SelectItem value="all">All Assistants</SelectItem>
                   {assistants.map((assistant) => (
                     <SelectItem key={assistant.id} value={assistant.id}>
                       {assistant.name}
@@ -181,7 +173,6 @@ export function CallsFilter({ onFilter }: CallsFilterProps) {
             </div>
           </div>
 
-          {/* Segunda fila: Fechas */}
           <div className="flex items-center space-x-2">
             <div className="relative flex-1">
               <Input
@@ -204,12 +195,11 @@ export function CallsFilter({ onFilter }: CallsFilterProps) {
             </div>
           </div>
 
-          {/* Tercera fila: Búsqueda y botones */}
           <div className="grid grid-cols-1 md:grid-cols-[1fr,auto] gap-4 items-center">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Buscar por ID o número"
+                placeholder="Search by ID or number"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -217,10 +207,10 @@ export function CallsFilter({ onFilter }: CallsFilterProps) {
             </div>
             <div className="flex gap-2 justify-end">
               <Button onClick={handleFilter} className="w-20">
-                Filtrar
+                Filter
               </Button>
               <Button onClick={handleReset} variant="outline" className="w-20">
-                Limpiar
+                Clear
               </Button>
             </div>
           </div>

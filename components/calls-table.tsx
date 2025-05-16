@@ -142,20 +142,20 @@ export function CallsTable() {
   const getEvaluationStatus = (call: Call) => {
     if (call.evaluation_score_human && call.evaluation_score_llm) {
       return {
-        label: "Evaluado",
+        label: "Evaluated",
         color: "default" as const,
         textColor: "text-green-600",
       };
     }
     if (call.evaluation_score_human) {
       return {
-        label: "En Proceso",
+        label: "In Progress",
         color: "secondary" as const,
         textColor: "text-blue-600",
       };
     }
     return {
-      label: "Pendiente",
+      label: "Pending",
       color: "destructive" as const,
       textColor: "text-red-600",
     };
@@ -185,7 +185,7 @@ export function CallsTable() {
                   onClick={() => handleSort("call_start_time")}
                   className="flex items-center gap-1"
                 >
-                  Fecha
+                  Date
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
@@ -195,7 +195,7 @@ export function CallsTable() {
                   onClick={() => handleSort("assistant.name")}
                   className="flex items-center gap-1"
                 >
-                  Asistente
+                  Assistant
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
@@ -205,7 +205,7 @@ export function CallsTable() {
                   onClick={() => handleSort("clinic.name")}
                   className="flex items-center gap-1"
                 >
-                  Clínica
+                  Clinic
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
@@ -215,7 +215,7 @@ export function CallsTable() {
                   onClick={() => handleSort("agent_type")}
                   className="flex items-center gap-1"
                 >
-                  Tipo
+                  Type
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
@@ -225,18 +225,18 @@ export function CallsTable() {
                   onClick={() => handleSort("duration")}
                   className="flex items-center gap-1"
                 >
-                  Duración
+                  Duration
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
-              <TableHead>Estado</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>
                 <Button
                   variant="ghost"
                   onClick={() => handleSort("evaluation_score_human")}
                   className="flex items-center gap-1"
                 >
-                  Score QA
+                  QA Score
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
@@ -246,24 +246,24 @@ export function CallsTable() {
                   onClick={() => handleSort("evaluation_score_llm")}
                   className="flex items-center gap-1"
                 >
-                  Score LLM
+                  LLM Score
                   <ArrowUpDown className="h-4 w-4" />
                 </Button>
               </TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-4">
-                  Cargando...
+                  Loading...
                 </TableCell>
               </TableRow>
             ) : calls.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-4">
-                  No hay llamadas para mostrar
+                  No calls to display
                 </TableCell>
               </TableRow>
             ) : (
@@ -285,7 +285,7 @@ export function CallsTable() {
                   <TableCell>{call.clinic?.name || "N/A"}</TableCell>
                   <TableCell>
                     <Badge variant={getCallTypeColor(call.agent_type)}>
-                      {call.agent_type === "inbound" ? "Entrante" : "Saliente"}
+                      {call.agent_type === "inbound" ? "Inbound" : "Outbound"}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -318,7 +318,7 @@ export function CallsTable() {
                     <Button variant="ghost" size="icon" asChild>
                       <a href={`/calls/${call.id}`}>
                         <Eye className="h-4 w-4" />
-                        <span className="sr-only">Ver detalles</span>
+                        <span className="sr-only">View details</span>
                       </a>
                     </Button>
                   </TableCell>
@@ -331,7 +331,7 @@ export function CallsTable() {
 
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          Mostrando {calls.length} de {totalCount} llamadas
+          Showing {calls.length} of {totalCount} calls
         </div>
         <div className="flex items-center space-x-2">
           <Button
@@ -341,7 +341,7 @@ export function CallsTable() {
             disabled={page === 1 || loading}
           >
             <ChevronLeft className="h-4 w-4" />
-            Anterior
+            Previous
           </Button>
           <Button
             variant="outline"
@@ -349,7 +349,7 @@ export function CallsTable() {
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages || loading}
           >
-            Siguiente
+            Next
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>

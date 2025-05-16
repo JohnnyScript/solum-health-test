@@ -33,31 +33,31 @@ export function AppSidebar() {
       active: pathname === "/",
     },
     {
-      title: "Llamadas",
+      title: "Calls",
       icon: Phone,
       href: "/calls",
       active: pathname === "/calls" || pathname.startsWith("/calls/"),
     },
     // {
-    //   title: "Métricas",
+    //   title: "Metrics",
     //   icon: BarChart3,
     //   href: "/metrics",
     //   active: pathname === "/metrics",
     // },
     // {
-    //   title: "Clínicas",
+    //   title: "Clinics",
     //   icon: Building2,
     //   href: "/clinics",
     //   active: pathname === "/clinics",
     // },
     // {
-    //   title: "Agentes",
+    //   title: "Agents",
     //   icon: User,
     //   href: "/agents",
     //   active: pathname === "/agents",
     // },
     // {
-    //   title: "Configuración",
+    //   title: "Settings",
     //   icon: Settings,
     //   href: "/settings",
     //   active: pathname === "/settings",
@@ -99,9 +99,9 @@ export function AppSidebar() {
                 <AvatarFallback>QA</AvatarFallback>
               </Avatar>
               <div>
-                <p className="text-sm font-medium">Analista QA</p>
+                <p className="text-sm font-medium">QA Analyst</p>
                 <p className="text-xs text-muted-foreground">
-                  analista@solumhealth.com
+                  analyst@solumhealth.com
                 </p>
               </div>
             </div>

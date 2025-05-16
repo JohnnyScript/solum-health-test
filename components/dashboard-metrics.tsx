@@ -3,7 +3,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Phone,
-  Clock,
   CheckCircle,
   AlertTriangle,
   Percent,
@@ -60,10 +59,6 @@ type MetricsData = {
     name: string;
     avgScore: number;
   }[];
-  sentimentDistribution: {
-    name: string;
-    value: number;
-  }[];
 };
 
 type Clinic = {
@@ -90,7 +85,6 @@ export function DashboardMetrics() {
     scoresOverTime: [],
     scoresByAssistant: [],
     scoresByClinic: [],
-    sentimentDistribution: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -303,25 +297,7 @@ export function DashboardMetrics() {
             avgScore: stats.total / stats.count,
           })
         );
-
-        // Process sentiment distribution (based on LLM scores)
-        const sentimentCounts = calls.reduce((acc, call) => {
-          let sentiment = "Neutral";
-          const score = call.evaluation_score_llm;
-          if (score !== null) {
-            if (score >= 4) sentiment = "Positive";
-            else if (score <= 2) sentiment = "Negative";
-          }
-          acc[sentiment] = (acc[sentiment] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-
-        const sentimentDistribution = Object.entries(sentimentCounts).map(
-          ([name, value]) => ({
-            name,
-            value: value as number,
-          })
-        );
+        console.log("scoresByClinic", scoresByClinic);
 
         setMetricsData({
           totalCalls,
@@ -334,7 +310,6 @@ export function DashboardMetrics() {
           scoresOverTime,
           scoresByAssistant,
           scoresByClinic,
-          sentimentDistribution,
         });
       } catch (error) {
         console.error("Error fetching metrics data:", error);
@@ -358,9 +333,9 @@ export function DashboardMetrics() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       {/* Filters */}
-      <Card>
+      <Card className="w-full">
         <CardContent className="p-4">
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -550,7 +525,7 @@ export function DashboardMetrics() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis domain={[0, 5]} />
-                  <Tooltip />
+                  <Tooltip formatter={(value: number) => value.toFixed(2)} />
                   <Legend />
                   <Line
                     type="monotone"
@@ -582,7 +557,7 @@ export function DashboardMetrics() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis domain={[0, 5]} />
-                  <Tooltip />
+                  <Tooltip formatter={(value: number) => value.toFixed(2)} />
                   <Bar dataKey="avgScore" fill="#8884d8" />
                 </BarChart>
               </ResponsiveContainer>
@@ -602,44 +577,9 @@ export function DashboardMetrics() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis domain={[0, 5]} />
-                  <Tooltip />
+                  <Tooltip formatter={(value: number) => value.toFixed(2)} />
                   <Bar dataKey="avgScore" fill="#82ca9d" />
                 </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Sentiment Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Call Sentiment Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={metricsData.sentimentDistribution}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
-                    }
-                  >
-                    {metricsData.sentimentDistribution.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
               </ResponsiveContainer>
             </div>
           </CardContent>

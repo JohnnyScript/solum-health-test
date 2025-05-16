@@ -87,16 +87,11 @@ export function DashboardMetrics() {
     scoresByClinic: [],
   });
   const [loading, setLoading] = useState(true);
+  const [currentFilters, setCurrentFilters] = useState<FilterParams>({});
 
   // Filter states
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [assistants, setAssistants] = useState<Assistant[]>([]);
-  const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
-  const [selectedAssistant, setSelectedAssistant] = useState<string | null>(
-    null
-  );
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
 
   // Load clinics and assistants
   useEffect(() => {
@@ -124,8 +119,8 @@ export function DashboardMetrics() {
     const loadAssistantsByClinic = async () => {
       try {
         const url = new URL("/api/options", window.location.origin);
-        if (selectedClinic) {
-          url.searchParams.set("clinicId", selectedClinic);
+        if (currentFilters.clinic_id) {
+          url.searchParams.set("clinicId", currentFilters.clinic_id);
         }
 
         const response = await fetch(url);
@@ -142,11 +137,12 @@ export function DashboardMetrics() {
     };
 
     loadAssistantsByClinic();
-  }, [selectedClinic]);
+  }, [currentFilters.clinic_id]);
 
   const handleFilter = async (filters: FilterParams) => {
     try {
       setLoading(true);
+      setCurrentFilters(filters);
       const url = new URL("/api/metrics", window.location.origin);
 
       // Add filter params
@@ -187,7 +183,7 @@ export function DashboardMetrics() {
   return (
     <div className="space-y-6 w-full">
       {/* Filters */}
-      <CallsFilter onFilter={handleFilter} />
+      <CallsFilter onFilter={handleFilter} initialFilters={currentFilters} />
 
       {/* Global KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

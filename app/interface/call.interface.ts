@@ -19,6 +19,6 @@ export interface Call {
   evaluation_comment_llm?: string;
   audio_url?: string;
   summary?: string;
-  created_at: string;
+  call_start_time: string;
   duration: number;
 }

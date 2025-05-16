@@ -24,10 +24,10 @@ export async function GET(request: Request) {
       query = query.eq("assistant_id", assistantId);
     }
     if (startDate) {
-      query = query.gte("created_at", startDate);
+      query = query.gte("call_start_time", startDate);
     }
     if (endDate) {
-      query = query.lte("created_at", endDate);
+      query = query.lte("call_start_time", endDate);
     }
 
     const { data: calls, error } = await query;
@@ -96,14 +96,16 @@ export async function GET(request: Request) {
     const scoresOverTime = Array.from(
       new Set(
         calls.map(
-          (call) => new Date(call.created_at || "").toISOString().split("T")[0]
+          (call) =>
+            new Date(call.call_start_time || "").toISOString().split("T")[0]
         )
       )
     )
       .map((date) => {
         const daysCalls = calls.filter(
           (call) =>
-            new Date(call.created_at || "").toISOString().split("T")[0] === date
+            new Date(call.call_start_time || "").toISOString().split("T")[0] ===
+            date
         );
         return {
           date,

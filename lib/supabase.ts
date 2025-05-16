@@ -40,7 +40,7 @@ export type Call = {
   evaluation_comment_human: string | null;
   evaluation_score_llm: number | null;
   evaluation_comment_llm: string | null;
-  created_at: string;
+  call_start_time: string;
   call_start_time: string | null;
   // Relaciones
   clinic?: Clinic;

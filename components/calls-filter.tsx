@@ -34,20 +34,30 @@ type Assistant = {
 
 interface CallsFilterProps {
   onFilter: (params: FilterParams) => void;
+  initialFilters?: FilterParams;
 }
 
-export function CallsFilter({ onFilter }: CallsFilterProps) {
+export function CallsFilter({
+  onFilter,
+  initialFilters = {},
+}: CallsFilterProps) {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [assistants, setAssistants] = useState<Assistant[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [selectedClinic, setSelectedClinic] = useState<string | null>(null);
-  const [selectedAssistant, setSelectedAssistant] = useState<string | null>(
-    null
+  const [selectedClinic, setSelectedClinic] = useState<string | null>(
+    initialFilters.clinic_id || null
   );
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedAssistant, setSelectedAssistant] = useState<string | null>(
+    initialFilters.assistant_id || null
+  );
+  const [startDate, setStartDate] = useState<string>(
+    initialFilters.start_date || ""
+  );
+  const [endDate, setEndDate] = useState<string>(initialFilters.end_date || "");
+  const [searchQuery, setSearchQuery] = useState<string>(
+    initialFilters.search_query || ""
+  );
 
   useEffect(() => {
     const loadOptions = async () => {

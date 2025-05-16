@@ -22,7 +22,7 @@
     evaluation_comment_human text null,
     evaluation_score_llm integer null,
     evaluation_comment_llm text null,
-    created_at timestamp with time zone null default now(),
+    call_start_time timestamp with time zone null default now(),
     call_start_time timestamp without time zone null,
     constraint calls_pkey primary key (id),
     constraint calls_agent_type_check check (

@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const searchTerm = searchParams.get("search");
-    const sortBy = searchParams.get("sortBy") || "created_at";
+    const sortBy = searchParams.get("sortBy") || "call_start_time";
     const sortOrder = (searchParams.get("sortOrder") || "desc") as
       | "asc"
       | "desc";
@@ -38,10 +38,10 @@ export async function GET(request: Request) {
       query = query.eq("assistant_id", assistantId);
     }
     if (startDate) {
-      query = query.gte("created_at", startDate);
+      query = query.gte("call_start_time", startDate);
     }
     if (endDate) {
-      query = query.lte("created_at", endDate);
+      query = query.lte("call_start_time", endDate);
     }
     if (searchTerm) {
       query = query.or(`

@@ -70,7 +70,7 @@ export function CallsTable() {
   // State for pagination and sorting
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
-  const [sortBy, setSortBy] = useState("created_at");
+  const [sortBy, setSortBy] = useState("call_start_time");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const router = useRouter();
 

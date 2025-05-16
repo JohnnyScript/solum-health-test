@@ -46,10 +46,10 @@ export default async function CallPage({ params }: { params: { id: string } }) {
   const transformedCall = {
     id: call.id,
     date: new Date(
-      call.call_start_time || call.created_at
+      call.call_start_time || call.call_start_time
     ).toLocaleDateString(),
     time: new Date(
-      call.call_start_time || call.created_at
+      call.call_start_time || call.call_start_time
     ).toLocaleTimeString(),
     assistant: call.assistant?.name || "Unknown",
     clinic: call.clinic?.name || "Unknown",
